@@ -120,54 +120,48 @@
                     <flux:error name="identifier" />
                 </flux:field>
 
-                {{-- Backend: FiveM Server Address --}}
-                <div class="space-y-3">
+                {{-- Backend IP and Port --}}
+                <div class="space-y-4">
                     <div>
-                        <flux:label>FiveM Server Address <span class="text-red-500">*</span></flux:label>
-                        <p class="text-xs text-zinc-500 mt-1">Your actual FiveM server IP and game port. Traffic is proxied here. Players never see your real IP.</p>
+                        <flux:label badge="Required">Game Server Network</flux:label>
+                        <p class="text-xs text-zinc-500 mt-1">Your actual FiveM server IP and game port. Traffic is proxied from our node to this address.</p>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <flux:field>
-                            <flux:label>Server IP</flux:label>
-                            <flux:input wire:model="src_ip" placeholder="103.42.116.182" />
-                            <flux:description>Your FiveM server's IP.</flux:description>
-                            <flux:error name="src_ip" />
-                        </flux:field>
-                        <flux:field>
-                            <flux:label>Game Port</flux:label>
-                            <flux:input wire:model="src_port" type="number" placeholder="30120" min="1" max="65535" />
-                            <flux:description>Default FiveM: 30120</flux:description>
-                            <flux:error name="src_port" />
-                        </flux:field>
+                    
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="col-span-2">
+                            <flux:field>
+                                <flux:label>Server IP</flux:label>
+                                <flux:input wire:model="src_ip" placeholder="103.42.116.182" />
+                                <flux:error name="src_ip" />
+                            </flux:field>
+                        </div>
+                        <div>
+                            <flux:field>
+                                <flux:label>Game Port</flux:label>
+                                <flux:input wire:model="src_port" type="number" placeholder="30120" />
+                                <flux:error name="src_port" />
+                            </flux:field>
+                        </div>
                     </div>
                 </div>
 
-                {{-- Proxy Listening Port --}}
-                <flux:field>
-                    <flux:label badge="Required">Proxy Listen Port</flux:label>
-                    <flux:input wire:model="dest_port" type="number" placeholder="5001" min="1" max="65535" />
-                    <flux:description>The port NGINX will listen on at the proxy node. Auto-filled from the selected node. Players connect via <code>kafka_{{ strtolower($identifier ?: 'id') }}.raznar.net:{port}</code>.</flux:description>
-                    <flux:error name="dest_port" />
-                </flux:field>
-
                 {{-- Node --}}
                 <flux:field>
-                    <flux:label badge="Required">Proxy Node</flux:label>
+                    <flux:label badge="Required">Proxy Region</flux:label>
                     <flux:select wire:model.live="node_id">
-                        <option value="">Select a node…</option>
+                        <option value="">Select a region…</option>
                         @forelse($nodes as $node)
                             <option value="{{ $node->id }}" {{ $node->status === 'offline' ? 'disabled' : '' }}>
                                 {{ $node->label }}
                                 @if($node->status === 'online') ✓ Online @if($node->latency_ms) ({{ $node->latency_ms }}ms) @endif
                                 @elseif($node->status === 'offline') ✗ Offline
-                                @else — Unknown
                                 @endif
                             </option>
                         @empty
-                            <option value="" disabled>No nodes available — contact support</option>
+                            <option value="" disabled>No regions available</option>
                         @endforelse
                     </flux:select>
-                    <flux:description>Selecting a node will suggest a proxy port automatically.</flux:description>
+                    <flux:description>The system will automatically assign an available proxy port on this node.</flux:description>
                     <flux:error name="node_id" />
                 </flux:field>
 
@@ -186,8 +180,11 @@
                                     $full  = $left <= 0;
                                 @endphp
                                 <option value="{{ $sub->id }}" {{ $full ? 'disabled' : '' }}>
-                                    {{ $sub->plan_name }} — {{ $left }}/{{ $sub->max_server }} slots available
-                                    {{ $full ? '(Full)' : '' }}
+                                    {{ $sub->plan_name }} — {{ $left }}/{{ $sub->max_server }} slots
+                                    @if($sub->expired_at)
+                                        (Exp: {{ $sub->expired_at->locale('id')->translatedFormat('d F Y H:i') }} WIB)
+                                    @endif
+                                    {{ $full ? '- Full' : '' }}
                                 </option>
                             @endforeach
                         @endif

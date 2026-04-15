@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\DeleteServerJob;
 use App\Jobs\ProvisionServerJob;
 use App\Models\Server;
+use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -18,11 +19,10 @@ class ServerService
     {
         $subscription = $user->subscriptions()
             ->where('id', $data['subscription_id'])
-            ->where('status', 'active')
             ->first();
 
-        if (! $subscription) {
-            throw ValidationException::withMessages(['subscription' => 'No active subscription found.']);
+        if (! $subscription || ! $subscription->isActive()) {
+            throw ValidationException::withMessages(['subscription' => 'No active or valid subscription found.']);
         }
 
         // Check limits
@@ -32,13 +32,16 @@ class ServerService
         }
 
         return DB::transaction(function () use ($user, $data, $subscription) {
+            // Generate random proxy port (now mandatory to be random as per requirement)
+            $destPort = $this->generateRandomPort($data['node_id']);
+
             $server = Server::create([
                 'user_id' => $user->id,
                 'label' => $data['label'],
                 'identifier' => strtolower($data['identifier']),
                 'src_ip' => $data['src_ip'],
-                'src_port' => $data['src_port'],
-                'dest_port' => $data['dest_port'],  // NGINX proxy listening port
+                'src_port' => $data['src_port'],   // backend port (e.g. 30120)
+                'dest_port' => $destPort,          // NGINX proxy listening port (random)
                 'node_id' => $data['node_id'],
                 'subscription_id' => $subscription->id,
                 'status' => 'pending',
@@ -73,5 +76,40 @@ class ServerService
     {
         $server->update(['status' => 'pending']);
         ProvisionServerJob::dispatch($server);
+    }
+
+    /**
+     * Suspend all servers for a subscription (trigger proxy deletion but keep DB records).
+     */
+    public function suspend(Subscription $subscription): void
+    {
+        foreach ($subscription->servers as $server) {
+            $proxyId = $server->proxy_id ?? "kafka_{$server->identifier}";
+            if ($server->node_id) {
+                DeleteServerJob::dispatch($server->node, $proxyId);
+            }
+            $server->update(['status' => 'suspended']);
+        }
+    }
+
+    /**
+     * Generate a random port within a configurable range that is not used on the node.
+     */
+    public function generateRandomPort(int $nodeId): int
+    {
+        $range = Setting::get('port_range', [
+            'min' => 20000,
+            'max' => 60000,
+        ]);
+
+        $usedPorts = Server::where('node_id', $nodeId)
+            ->pluck('dest_port')
+            ->toArray();
+
+        do {
+            $port = rand($range['min'], $range['max']);
+        } while (in_array($port, $usedPorts));
+
+        return $port;
     }
 }

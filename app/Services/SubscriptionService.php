@@ -24,6 +24,16 @@ class SubscriptionService
         }
     }
 
+    public function restoreServers(Subscription $subscription): void
+    {
+        foreach ($subscription->servers as $server) {
+            if ($server->status === 'suspended') {
+                $server->update(['status' => 'pending']);
+                ProvisionServerJob::dispatch($server);
+            }
+        }
+    }
+
     protected function activateServers(Subscription $subscription): void
     {
         foreach ($subscription->servers as $server) {
@@ -35,7 +45,10 @@ class SubscriptionService
     protected function suspendServers(Subscription $subscription): void
     {
         foreach ($subscription->servers as $server) {
-            DeleteServerJob::dispatch($server, false); // false = don't delete from DB
+            $proxyId = $server->proxy_id ?? "kafka_{$server->identifier}";
+            if ($server->node_id && $server->node) {
+                DeleteServerJob::dispatch($server->node, $proxyId);
+            }
             $server->update(['status' => 'suspended']);
         }
     }
@@ -43,7 +56,11 @@ class SubscriptionService
     protected function terminateServers(Subscription $subscription): void
     {
         foreach ($subscription->servers as $server) {
-            DeleteServerJob::dispatch($server, true); // true = delete from DB
+            $proxyId = $server->proxy_id ?? "kafka_{$server->identifier}";
+            if ($server->node_id && $server->node) {
+                DeleteServerJob::dispatch($server->node, $proxyId);
+            }
+            $server->delete();
         }
         $subscription->delete();
     }

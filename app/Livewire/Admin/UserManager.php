@@ -3,9 +3,12 @@
 namespace App\Livewire\Admin;
 
 use App\Models\Plan;
+use App\Models\Setting;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\SSOService;
+use App\Services\SubscriptionService;
+use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -137,16 +140,60 @@ class UserManager extends Component
         $plan = Plan::findOrFail($this->selectedPlanId);
         $user = User::findOrFail($this->manageSubUserId);
 
+        $expiredAt = $this->calculateExpiry();
+
         Subscription::create([
             'user_id' => $user->id,
             'external_id' => 'manual_'.Str::random(8),
             'plan_name' => $plan->name,
             'max_server' => $plan->max_server,
             'status' => 'active',
+            'expired_at' => $expiredAt,
         ]);
 
         $this->selectedPlanId = null;
         Flux::toast(text: "Plan {$plan->name} assigned to {$user->name}.", variant: 'success');
+    }
+
+    public function renewSubscription(int $subId)
+    {
+        $sub = Subscription::where('id', $subId)->where('user_id', $this->manageSubUserId)->firstOrFail();
+
+        $expiredAt = $this->calculateExpiry();
+        $wasAlreadyActive = $sub->status === 'active';
+
+        $sub->update([
+            'status' => 'active',
+            'expired_at' => $expiredAt,
+        ]);
+
+        // If status was already 'active' (expired but not yet suspended by cron),
+        // the observer won't fire because status didn't change. Manually restore servers.
+        if ($wasAlreadyActive) {
+            app(SubscriptionService::class)->restoreServers($sub);
+        }
+
+        Flux::toast(text: 'Subscription renewed successfully. Suspended servers are being restored.', variant: 'success');
+    }
+
+    /**
+     * Calculate the expiry date based on the system's subscription duration setting.
+     * Uses CarbonImmutable-safe chaining to avoid mutation bugs.
+     */
+    protected function calculateExpiry(): CarbonImmutable
+    {
+        $duration = Setting::get('subscription_duration_default', ['value' => 30, 'unit' => 'days']);
+        if (! is_array($duration)) {
+            $duration = ['value' => 30, 'unit' => 'days'];
+        }
+        $val = max(1, (int) ($duration['value'] ?? 30));
+        $unit = $duration['unit'] ?? 'days';
+
+        return match ($unit) {
+            'months' => now()->addMonths($val),
+            'years' => now()->addYears($val),
+            default => now()->addDays($val),
+        };
     }
 
     public function confirmRevokeSubscription(int $subId)

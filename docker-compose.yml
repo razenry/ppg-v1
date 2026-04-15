@@ -4,7 +4,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: laravel-app
     container_name: laravel-app
     restart: unless-stopped
     tty: true
@@ -68,6 +67,22 @@ services:
       ARBITRARY: 1
     depends_on:
       - db
+    networks:
+      - laravel-network
+
+  # Queue Worker
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: laravel-worker
+    restart: unless-stopped
+    command: php artisan queue:work --tries=3 --timeout=360
+    volumes:
+      - ./:/var/www
+    depends_on:
+      - db
+      - app
     networks:
       - laravel-network
 

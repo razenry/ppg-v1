@@ -14,10 +14,12 @@ class Dashboard extends Component
     {
         $user = Auth::user();
         $servers = $user->servers()->with(['node', 'subscription'])->latest()->get();
-        $subs = $user->subscriptions()->where('status', 'active')->get();
+        $subs = $user->subscriptions()->get(); // Fetch all to show history accurately
+        $activeSubs = $subs->filter(fn ($sub) => $sub->isActive());
+
         $totalActive = $servers->where('status', 'active')->count();
-        $totalUsed = $servers->whereIn('status', ['active', 'pending', 'failed'])->count();
-        $totalLimit = $subs->sum('max_server');
+        $totalUsed = $servers->count(); // All undeleted servers consume quota
+        $totalLimit = $activeSubs->sum('max_server');
 
         return view('livewire.client.dashboard', [
             'user' => $user,

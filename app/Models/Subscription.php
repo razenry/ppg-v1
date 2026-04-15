@@ -19,7 +19,36 @@ class Subscription extends Model
         'plan_name',
         'max_server',
         'status',
+        'expired_at',
     ];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'expired_at' => 'datetime',
+        ];
+    }
+
+    /**
+     * Determine if the subscription is active.
+     */
+    public function isActive(): bool
+    {
+        if ($this->status !== 'active') {
+            return false;
+        }
+
+        if ($this->expired_at && $this->expired_at->isPast()) {
+            return false;
+        }
+
+        return true;
+    }
 
     /**
      * Get the user that owns the subscription.

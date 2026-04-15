@@ -14,6 +14,13 @@ class ServerDetail extends Component
 {
     public int $serverId;
 
+    // Delete Modal State
+    public $showDeleteModal = false;
+
+    public $deleteServerIdentifier = '';
+
+    public $deleteVerificationInput = '';
+
     public function mount($id)
     {
         // Only store the ID — fetch fresh on every render
@@ -37,8 +44,21 @@ class ServerDetail extends Component
         Flux::toast(text: 'Redeployment queued for '.$this->server->identifier.'.', variant: 'success');
     }
 
-    public function delete(ServerService $serverService)
+    public function confirmDelete(): void
     {
+        $this->deleteServerIdentifier = $this->server->identifier;
+        $this->deleteVerificationInput = '';
+        $this->showDeleteModal = true;
+    }
+
+    public function executeDelete(ServerService $serverService)
+    {
+        if ($this->deleteVerificationInput !== $this->deleteServerIdentifier) {
+            $this->addError('deleteVerificationInput', 'Identifier does not match.');
+
+            return;
+        }
+
         $serverService->delete($this->server);
 
         return redirect()->route('servers.index');

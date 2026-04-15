@@ -26,11 +26,8 @@ class ServerManager extends Component
     /** FiveM server IP — where traffic is proxied to */
     public $src_ip;
 
-    /** FiveM server port — where traffic is proxied to */
+    /** Backend Game Port (FiveM) — e.g. 30120 */
     public $src_port = 30120;
-
-    /** Proxy listening port on the NGINX node — what players connect to */
-    public $dest_port;
 
     public $node_id;
 
@@ -57,7 +54,9 @@ class ServerManager extends Component
         $user = Auth::user();
         $this->servers = $user->servers()->with(['node', 'subscription'])->get();
         $this->nodes = Node::all();
-        $this->subscriptions = $user->subscriptions()->where('status', 'active')->get();
+        $this->subscriptions = $user->subscriptions()
+            ->get()
+            ->filter(fn ($sub) => $sub->isActive());
     }
 
     public function resetFields()
@@ -65,8 +64,7 @@ class ServerManager extends Component
         $this->label = '';
         $this->identifier = '';
         $this->src_ip = '';
-        $this->src_port = 30120; // Default FiveM server port
-        $this->dest_port = null;
+        $this->src_port = 30120;
         $this->node_id = null;
         $this->subscription_id = $this->subscriptions->first()?->id;
     }
@@ -92,9 +90,8 @@ class ServerManager extends Component
     }
 
     /**
-     * When a node is selected, auto-fill dest_port with the node's parsed port
-     * (the Golang API port, which also serves as the default NGINX proxy port).
-     * src_ip / src_port are for the FiveM server — entered by the user separately.
+     * When a node is selected, we can auto-fill src_ip if the node matches
+     * but we no longer suggest a dest_port (proxy port) because it's random.
      */
     public function updatedNodeId(): void
     {
@@ -108,11 +105,10 @@ class ServerManager extends Component
             return;
         }
 
-        // Suggest the node's API port as default proxy port (user can change)
         $parsed = parse_url($node->api_url);
 
-        if (! $this->dest_port && ! empty($parsed['port'])) {
-            $this->dest_port = $parsed['port'];
+        if (! $this->src_ip && ! empty($parsed['host'])) {
+            $this->src_ip = $parsed['host'];
         }
     }
 
@@ -134,7 +130,6 @@ class ServerManager extends Component
             'identifier' => 'required|alpha_dash|min:3|max:32|unique:servers,identifier',
             'src_ip' => 'required|ip',
             'src_port' => 'required|integer|min:1|max:65535',
-            'dest_port' => 'required|integer|min:1|max:65535',
             'node_id' => 'required|exists:nodes,id',
             'subscription_id' => 'required|exists:subscriptions,id',
         ]);
@@ -145,7 +140,6 @@ class ServerManager extends Component
                 'identifier' => $this->identifier,
                 'src_ip' => $this->src_ip,
                 'src_port' => (int) $this->src_port,
-                'dest_port' => (int) $this->dest_port,
                 'node_id' => $this->node_id,
                 'subscription_id' => $this->subscription_id,
             ]);

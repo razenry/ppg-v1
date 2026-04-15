@@ -1,4 +1,4 @@
-<div class="space-y-6">
+<div class="space-y-6" @if($server->status === 'pending') wire:poll.5000ms @endif>
     <header class="flex items-center gap-4">
         <flux:button variant="ghost" icon="chevron-left" href="{{ route('servers.index') }}" wire:navigate />
         <div>
@@ -135,7 +135,7 @@
                         <span wire:loading wire:target="redeploy">Triggering…</span>
                     </flux:button>
                     <div class="pt-4 mt-1 border-t border-zinc-100 dark:border-zinc-800">
-                        <flux:button wire:click="delete" variant="ghost" color="red" icon="trash" class="w-full">
+                        <flux:button wire:click="confirmDelete" variant="ghost" color="red" icon="trash" class="w-full">
                             Terminate Instance
                         </flux:button>
                     </div>
@@ -164,4 +164,35 @@
             @endif
         </div>
     </div>
+
+    {{-- Secure Delete Modal --}}
+    <flux:modal wire:model="showDeleteModal" class="md:w-[28rem]">
+        <form wire:submit="executeDelete" class="space-y-6">
+            <div>
+                <flux:heading size="lg" class="text-red-500">Terminate Instance?</flux:heading>
+                <flux:subheading class="mt-2">
+                    <p>You're about to delete this server and its configurations. This action cannot be undone.</p>
+                    <p class="mt-2">Please type <strong class="text-zinc-900 dark:text-white font-mono bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">{{ $deleteServerIdentifier }}</strong> to confirm.</p>
+                </flux:subheading>
+            </div>
+
+            <flux:field>
+                <flux:input wire:model.live="deleteVerificationInput" placeholder="{{ $deleteServerIdentifier }}" autocomplete="off" />
+                <flux:error name="deleteVerificationInput" />
+            </flux:field>
+
+            <div class="flex gap-2" x-data="{ countdown: 5 }" x-init="
+                $watch('$wire.showDeleteModal', value => {
+                    if (value) { countdown = 5; let i = setInterval(() => { if(countdown > 0) countdown--; else clearInterval(i); }, 1000); }
+                })
+            ">
+                <flux:spacer />
+                <flux:button wire:click="$set('showDeleteModal', false)" variant="ghost">Cancel</flux:button>
+                <flux:button type="submit" variant="danger" x-bind:disabled="countdown > 0 || $wire.deleteVerificationInput !== $wire.deleteServerIdentifier">
+                    <span x-show="countdown > 0" x-text="'Wait ' + countdown + 's'"></span>
+                    <span x-show="countdown === 0">Terminate Permanently</span>
+                </flux:button>
+            </div>
+        </form>
+    </flux:modal>
 </div>

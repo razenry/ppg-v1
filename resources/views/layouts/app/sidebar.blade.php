@@ -20,6 +20,9 @@
                 <flux:navlist.item icon="server" :href="route('servers.index')" :current="request()->routeIs('servers.*')" wire:navigate>
                     {{ __('My Servers') }}
                 </flux:navlist.item>
+                <flux:navlist.item icon="ticket" :href="route('my-plan')" :current="request()->routeIs('my-plan')" wire:navigate>
+                    {{ __('My Plans') }}
+                </flux:navlist.item>
             @endif
 
             @if(auth()->user()?->is_admin)
@@ -35,6 +38,9 @@
                     </flux:navlist.item>
                     <flux:navlist.item icon="users" :href="route('admin.users')" :current="request()->routeIs('admin.users')" wire:navigate>
                         {{ __('Users') }}
+                    </flux:navlist.item>
+                    <flux:navlist.item icon="cog-8-tooth" :href="route('admin.settings')" :current="request()->routeIs('admin.settings')" wire:navigate>
+                        {{ __('System Settings') }}
                     </flux:navlist.item>
                 </flux:navlist.group>
             @endif
@@ -62,6 +68,12 @@
                 <flux:profile :name="auth()->user()->name" :initials="auth()->user()->initials()" icon-trailing="chevron-up-down" />
 
                 <flux:menu>
+                    @if(auth()->user()->is_admin)
+                        <flux:menu.item icon="arrow-path-rounded-square" href="{{ route('admin.impersonate.start', auth()->user()->id) }}">
+                            {{ __('Switch to Client Mode') }}
+                        </flux:menu.item>
+                        <flux:menu.separator />
+                    @endif
                     <flux:menu.item icon="arrow-right-start-on-rectangle" href="{{ route('logout') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
                         {{ __('Log out') }}
                     </flux:menu.item>
@@ -83,6 +95,12 @@
                 <flux:menu>
                     <flux:menu.item icon="user" :href="route('profile.edit')" wire:navigate>{{ __('Profile') }}</flux:menu.item>
                     <flux:menu.separator />
+                    @if(auth()->user()->is_admin)
+                        <flux:menu.item icon="arrow-path-rounded-square" href="{{ route('admin.impersonate.start', auth()->user()->id) }}">
+                            {{ __('Switch to Client Mode') }}
+                        </flux:menu.item>
+                        <flux:menu.separator />
+                    @endif
                     <flux:menu.item
                         icon="arrow-right-start-on-rectangle"
                         href="{{ route('logout') }}"

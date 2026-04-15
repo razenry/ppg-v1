@@ -59,7 +59,7 @@
                             <flux:dropdown align="end">
                                 <flux:button variant="ghost" icon="ellipsis-horizontal" size="sm" inset="top bottom" />
                                 <flux:menu>
-                                    <flux:menu.item wire:click="generateSSOLink({{ $user->id }})" icon="arrow-right-end-on-rectangle">Login as User</flux:menu.item>
+                                    <flux:menu.item href="{{ route('admin.impersonate.start', $user->id) }}" icon="arrow-right-end-on-rectangle">Login as User</flux:menu.item>
                                     <flux:menu.separator />
                                     <flux:menu.item wire:click="openModal({{ $user->id }})" icon="pencil-square">Edit User</flux:menu.item>
                                     <flux:menu.item wire:click="openSubModal({{ $user->id }})" icon="ticket">Manage Subs</flux:menu.item>
@@ -141,18 +141,35 @@
                         <thead class="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-700">
                             <tr>
                                 <th class="px-4 py-3 font-medium">Plan Name</th>
-                                <th class="px-4 py-3 font-medium">Ext ID</th>
-                                <th class="px-4 py-3 font-medium">Max Servers</th>
-                                <th class="px-4 py-3 font-medium text-right">Revoke</th>
+                                <th class="px-4 py-3 font-medium">Limits</th>
+                                <th class="px-4 py-3 font-medium">Status & Expiration</th>
+                                <th class="px-4 py-3 font-medium text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
                             @forelse($manageUser->subscriptions as $sub)
                                 <tr>
-                                    <td class="px-4 py-3 font-medium">{{ $sub->plan_name }}</td>
-                                    <td class="px-4 py-3 text-zinc-500 font-mono text-xs">{{ $sub->external_id }}</td>
-                                    <td class="px-4 py-3"><flux:badge size="sm">{{ $sub->max_server }}</flux:badge></td>
-                                    <td class="px-4 py-3 text-right">
+                                    <td class="px-4 py-3">
+                                        <div class="font-medium text-zinc-900 dark:text-white">{{ $sub->plan_name }}</div>
+                                        <div class="text-xs font-mono text-zinc-500 mt-0.5">{{ $sub->external_id }}</div>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <div class="text-sm"><span class="font-medium">{{ $sub->servers->count() }}</span> / {{ $sub->max_server }} limits</div>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        @if($sub->isActive())
+                                            <flux:badge color="green" size="sm" variant="subtle">Active</flux:badge>
+                                        @else
+                                            <flux:badge color="red" size="sm" variant="subtle">Expired</flux:badge>
+                                        @endif
+                                        @if($sub->expired_at)
+                                            <div class="mt-1 text-[11px] font-medium text-zinc-500">Exp: {{ $sub->expired_at->locale('id')->translatedFormat('d M Y H:i') }}</div>
+                                        @endif
+                                    </td>
+                                    <td class="px-4 py-3 text-right flex gap-2 justify-end">
+                                        @if(!$sub->isActive())
+                                            <flux:button variant="primary" size="sm" icon="arrow-path" wire:click="renewSubscription({{ $sub->id }})">Renew</flux:button>
+                                        @endif
                                         <flux:button variant="danger" size="sm" icon="x-mark" wire:click="confirmRevokeSubscription({{ $sub->id }})">Revoke</flux:button>
                                     </td>
                                 </tr>

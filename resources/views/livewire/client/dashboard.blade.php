@@ -49,7 +49,7 @@
                 <div class="{{ $color }} h-full rounded-full transition-all duration-700" style="width: {{ $pct }}%"></div>
             </div>
             <div class="flex justify-between mt-2">
-                <flux:text variant="subtle" size="xs">{{ $pct }}% of quota used (active + pending + failed)</flux:text>
+                <flux:text variant="subtle" size="xs">{{ $pct }}% of quota used (all active and suspended servers)</flux:text>
                 @if($pct >= 90)
                     <flux:text size="xs" class="text-red-500 font-medium">Near limit!</flux:text>
                 @endif
@@ -64,8 +64,8 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 @foreach($subs as $sub)
                     @php
-                        // Count all statuses to match ServerService limit enforcement
-                        $used   = $servers->where('subscription_id', $sub->id)->whereIn('status', ['active', 'pending', 'failed'])->count();
+                        // Count all statuses to match ServerService limit enforcement accurately
+                        $used   = $servers->where('subscription_id', $sub->id)->count();
                         $subPct = $sub->max_server > 0 ? min(100, round(($used / $sub->max_server) * 100)) : 0;
                     @endphp
                     <div class="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-5">
@@ -73,8 +73,17 @@
                             <div>
                                 <div class="font-semibold text-zinc-900 dark:text-white">{{ $sub->plan_name }}</div>
                                 <div class="text-xs text-zinc-400 font-mono mt-0.5">{{ $sub->external_id }}</div>
+                                @if($sub->expired_at)
+                                    <div class="text-[11px] text-orange-500 font-medium mt-1">
+                                        Exp: {{ $sub->expired_at->locale('id')->translatedFormat('d M Y H:i') }} WIB
+                                    </div>
+                                @endif
                             </div>
-                            <flux:badge color="green" size="sm" variant="subtle">Active</flux:badge>
+                            @if($sub->isActive())
+                                <flux:badge color="green" size="sm" variant="subtle">Active</flux:badge>
+                            @else
+                                <flux:badge color="red" size="sm" variant="subtle">Expired</flux:badge>
+                            @endif
                         </div>
                         <div class="flex items-baseline gap-1 mt-4 mb-2">
                             <span class="text-2xl font-bold text-zinc-900 dark:text-white">{{ $used }}</span>

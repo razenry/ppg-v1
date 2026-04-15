@@ -33,7 +33,6 @@ class StoreServerRequest extends FormRequest
                 'unique:servers,identifier',
             ],
             'src_ip' => ['required', 'ip'],
-            'src_port' => ['required', 'integer', 'min:1', 'max:65535'],
             'node_id' => ['required', 'exists:nodes,id'],
             'subscription_id' => ['required', 'exists:subscriptions,id'],
         ];
