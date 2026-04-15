@@ -36,18 +36,16 @@ RUN npm install
 # Copy application code for asset building (needs views for Tailwind)
 COPY . .
 
-# Copy vendor from deps stage (needed for Tailwind v4 to resolve Flux CSS)
+# Build assets (needs vendor for Tailwind v4)
 COPY --from=deps /var/www/vendor /var/www/vendor
-
-# Build assets
 RUN npm run build
 
 # ---
 
-# Stage 3: Final Production Image
-FROM php:8.4-fpm-alpine AS production
+# Stage 3: Final Production Image with FrankenPHP
+FROM dunglas/frankenphp:1-php8.4-alpine AS production
 
-WORKDIR /var/www
+WORKDIR /app
 
 # Install system dependencies
 RUN apk add --no-cache \
@@ -63,29 +61,44 @@ RUN apk add --no-cache \
 # Install PHP extensions
 RUN docker-php-ext-install pdo_mysql mbstring zip exif pcntl bcmath gd intl
 
-# Install Composer
+# Install Composer (needed for dump-autoload)
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Setup user
-RUN addgroup -g 1000 -S www && \
-    adduser -u 1000 -S www -G www
-
 # Copy application code
-COPY --chown=www:www . .
+COPY . .
 
 # Copy vendor from deps stage
-COPY --chown=www:www --from=deps /var/www/vendor /var/www/vendor
+COPY --from=deps /var/www/vendor ./vendor
 
 # Copy built assets from assets stage
-COPY --chown=www:www --from=assets /var/www/public/build /var/www/public/build
+COPY --from=assets /var/www/public/build ./public/build
 
 # Run composer autoloader and scripts
 RUN composer dump-autoload --no-dev --optimize
 
-# Change current user to www
-USER www
+# Production configuration
+RUN cp .env.example .env && \
+    php artisan key:generate
 
-# Expose port 9000
-EXPOSE 9000
+# FrankenPHP configuration
+ENV FRANKENPHP_CONFIG="worker ./public/index.php"
+ENV APP_RUNTIME=Laravel\\Octane\\FrankenPHP\\Runtime
+# If not using Octane, FrankenPHP works as a standard server too
+# We'll stick to standard mode for now to avoid extra dependencies
+ENV APP_ENV=production
+ENV APP_DEBUG=false
 
-CMD ["php-fpm"]
+# Setup permissions
+RUN chown -R root:root . && \
+    chmod -R 755 . && \
+    chown -R www-data:www-data storage bootstrap/cache
+
+# Change user if needed, but FrankenPHP often runs as root to bind port 80
+# and then drops privileges or uses separate worker users.
+# For Alpine, it uses www-data.
+
+# Expose port 80
+EXPOSE 80
+EXPOSE 443
+
+# Entrypoint is handled by FrankenPHP image
