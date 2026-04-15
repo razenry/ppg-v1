@@ -36,6 +36,9 @@ RUN npm install
 # Copy application code for asset building (needs views for Tailwind)
 COPY . .
 
+# Copy vendor from deps stage (needed for Tailwind v4 to resolve Flux CSS)
+COPY --from=deps /var/www/vendor /var/www/vendor
+
 # Build assets
 RUN npm run build
 
