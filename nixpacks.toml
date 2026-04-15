@@ -1,0 +1,10 @@
+[phases.setup]
+nixPkgs = ["...", "php83", "php83Packages.composer", "nodejs-22_x"]
+
+[phases.install]
+dependsOn = ["setup"]
+cmds = ["composer install --no-dev --optimize-autoloader", "npm install"]
+
+[phases.build]
+dependsOn = ["install"]
+cmds = ["npm run build"]
