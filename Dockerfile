@@ -81,12 +81,10 @@ RUN cp .env.example .env && \
     php artisan key:generate
 
 # FrankenPHP configuration
-ENV FRANKENPHP_CONFIG="worker ./public/index.php"
-ENV APP_RUNTIME=Laravel\\Octane\\FrankenPHP\\Runtime
-# If not using Octane, FrankenPHP works as a standard server too
-# We'll stick to standard mode for now to avoid extra dependencies
+ENV SERVER_NAME=:80
 ENV APP_ENV=production
 ENV APP_DEBUG=false
+ENV LOG_CHANNEL=stderr
 
 # Setup permissions
 RUN chown -R root:root . && \
