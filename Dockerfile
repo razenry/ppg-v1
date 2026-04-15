@@ -63,6 +63,9 @@ RUN apk add --no-cache \
 # Install PHP extensions
 RUN docker-php-ext-install pdo_mysql mbstring zip exif pcntl bcmath gd intl
 
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
 # Setup user
 RUN addgroup -g 1000 -S www && \
     adduser -u 1000 -S www -G www
