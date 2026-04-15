@@ -1,51 +1,85 @@
-FROM php:8.4-fpm
+# Stage 1: Build PHP dependencies
+FROM php:8.4-fpm-alpine AS deps
 
-# Set working directory
 WORKDIR /var/www
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libpng-dev \
-    libjpeg62-turbo-dev \
-    libfreetype6-dev \
-    locales \
-    zip \
-    jpegoptim optipng pngquant gifsicle \
-    vim \
-    unzip \
-    git \
+# Install system dependencies for composer
+RUN apk add --no-cache \
     curl \
-    libonig-dev \
+    git \
+    unzip \
     libzip-dev \
-    libxml2-dev
-
-# Clear cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Install PHP extensions
-RUN docker-php-ext-install pdo_mysql mbstring zip exif pcntl bcmath gd
+    zip
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Install Node.js
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y nodejs
+# Copy composer files
+COPY composer.json composer.lock ./
 
-# Add user for laravel application
-RUN groupadd -g 1000 www
-RUN useradd -u 1000 -ms /bin/bash -g www www
+# Install dependencies
+RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist
 
-# Copy existing application directory contents
-COPY . /var/www
+# ---
 
-# Copy existing application directory permissions
-COPY --chown=www:www . /var/www
+# Stage 2: Build frontend assets
+FROM node:22-alpine AS assets
+
+WORKDIR /var/www
+
+# Copy package files
+COPY package.json package-lock.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy application code for asset building (needs views for Tailwind)
+COPY . .
+
+# Build assets
+RUN npm run build
+
+# ---
+
+# Stage 3: Final Production Image
+FROM php:8.4-fpm-alpine AS production
+
+WORKDIR /var/www
+
+# Install system dependencies
+RUN apk add --no-cache \
+    libpng-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
+    libzip-dev \
+    zip \
+    unzip \
+    oniguruma-dev \
+    icu-dev
+
+# Install PHP extensions
+RUN docker-php-ext-install pdo_mysql mbstring zip exif pcntl bcmath gd intl
+
+# Setup user
+RUN addgroup -g 1000 -S www && \
+    adduser -u 1000 -S www -G www
+
+# Copy application code
+COPY --chown=www:www . .
+
+# Copy vendor from deps stage
+COPY --chown=www:www --from=deps /var/www/vendor /var/www/vendor
+
+# Copy built assets from assets stage
+COPY --chown=www:www --from=assets /var/www/public/build /var/www/public/build
+
+# Run composer autoloader and scripts
+RUN composer dump-autoload --no-dev --optimize
 
 # Change current user to www
 USER www
 
-# Expose port 9000 and start php-fpm server
+# Expose port 9000
 EXPOSE 9000
+
 CMD ["php-fpm"]
