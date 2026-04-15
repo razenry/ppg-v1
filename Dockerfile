@@ -27,17 +27,19 @@ FROM node:22-alpine AS assets
 
 WORKDIR /var/www
 
-# Copy package files
+# Copy package files first (for npm install cache)
 COPY package.json package-lock.json ./
 
-# Install dependencies
+# Install npm dependencies
 RUN npm install
 
-# Copy application code for asset building (needs views for Tailwind)
+# Copy ALL application source (Blade views, CSS, JS) - any change here busts the build cache
 COPY . .
 
-# Build assets (needs vendor for Tailwind v4)
+# Copy vendor for Tailwind v4 (needs PHP package discovery)
 COPY --from=deps /var/www/vendor /var/www/vendor
+
+# Build assets - runs fresh whenever source files change
 RUN npm run build
 
 # ---
