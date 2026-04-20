@@ -4,12 +4,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: production
     container_name: laravel-app
     restart: unless-stopped
-    tty: true
     environment:
-      SERVICE_NAME: app
-      SERVICE_TAGS: dev
       DB_CONNECTION: mysql
       DB_HOST: db
       DB_DATABASE: ${DB_DATABASE:-laravel}
@@ -17,19 +15,18 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-laravel_password}
     working_dir: /var/www
     volumes:
-      - public-data:/var/www/public
-      - storage-data:/var/www/storage
       - ./.env:/var/www/.env
       - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+      - public-data:/var/www/public
+      - storage-data:/var/www/storage
     networks:
       - laravel-network
 
   # Nginx Web Server
   web:
-    image: nginx:alpine
+    image: nginx:stable-alpine
     container_name: laravel-web
     restart: unless-stopped
-    tty: true
     volumes:
       - public-data:/var/www/public
       - ./docker/nginx/laravel.conf:/etc/nginx/conf.d/default.conf
@@ -43,31 +40,13 @@ services:
     image: mysql:9.0
     container_name: laravel-db
     restart: unless-stopped
-    tty: true
     environment:
       MYSQL_DATABASE: ${DB_DATABASE:-laravel}
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
       MYSQL_PASSWORD: ${DB_PASSWORD:-laravel_password}
       MYSQL_USER: ${DB_USERNAME:-laravel_user}
-      SERVICE_TAGS: dev
-      SERVICE_NAME: mysql
     volumes:
       - db-data:/var/lib/mysql
-    networks:
-      - laravel-network
-
-  # phpMyAdmin
-  phpmyadmin:
-    image: phpmyadmin/phpmyadmin
-    container_name: laravel-pma
-    restart: unless-stopped
-    tty: true
-    environment:
-      PMA_HOST: db
-      PMA_PORT: 3306
-      ARBITRARY: 1
-    depends_on:
-      - db
     networks:
       - laravel-network
 
@@ -76,18 +55,20 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: production
     container_name: laravel-worker
     restart: unless-stopped
+    command: php artisan queue:work --tries=3 --timeout=360
     environment:
       DB_CONNECTION: mysql
       DB_HOST: db
       DB_DATABASE: ${DB_DATABASE:-laravel}
       DB_USERNAME: ${DB_USERNAME:-laravel_user}
       DB_PASSWORD: ${DB_PASSWORD:-laravel_password}
-    command: php artisan queue:work --tries=3 --timeout=360
+    working_dir: /var/www
     volumes:
-      - storage-data:/var/www/storage
       - ./.env:/var/www/.env
+      - storage-data:/var/www/storage
     depends_on:
       - db
       - app
