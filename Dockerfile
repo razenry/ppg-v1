@@ -44,10 +44,10 @@ RUN npm run build
 
 # ---
 
-# Stage 3: Final Production Image with FrankenPHP
-FROM dunglas/frankenphp:1-php8.4-alpine AS production
+# Stage 3: Final Production Image
+FROM php:8.4-fpm-alpine AS production
 
-WORKDIR /app
+WORKDIR /var/www
 
 # Install system dependencies
 RUN apk add --no-cache \
@@ -82,8 +82,6 @@ RUN composer dump-autoload --no-dev --optimize
 RUN cp .env.example .env && \
     php artisan key:generate
 
-# FrankenPHP configuration
-ENV SERVER_NAME=:80
 ENV APP_ENV=production
 ENV APP_DEBUG=false
 ENV LOG_CHANNEL=stderr
@@ -93,12 +91,10 @@ RUN chown -R root:root . && \
     chmod -R 755 . && \
     chown -R www-data:www-data storage bootstrap/cache
 
-# Change user if needed, but FrankenPHP often runs as root to bind port 80
-# and then drops privileges or uses separate worker users.
-# For Alpine, it uses www-data.
+# Change user to www-data for FPM
+USER www-data
 
-# Expose port 80
-EXPOSE 80
-EXPOSE 443
+# Expose port 9000
+EXPOSE 9000
 
-# Entrypoint is handled by FrankenPHP image
+CMD ["php-fpm"]
